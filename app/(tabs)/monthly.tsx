@@ -1,11 +1,11 @@
 import React from 'react';
-import SettingsScreen from '../../components/SettingsScreen';
+import MonthlyViewScreen from '../../components/MonthlyViewScreen';
 import { AppProvider } from '../../context/AppContext';
 
-export default function SettingsTab() {
+export default function MonthlyTab() {
   return (
     <AppProvider>
-      <SettingsScreen />
+      <MonthlyViewScreen />
     </AppProvider>
   );
 }
