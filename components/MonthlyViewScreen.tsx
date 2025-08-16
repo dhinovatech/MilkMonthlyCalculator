@@ -1,7 +1,9 @@
+import { useFocusEffect } from 'expo-router';
 import React, { useContext, useState } from 'react';
-import { Alert, Button, ScrollView, StyleSheet, Text, TouchableOpacity, View, useColorScheme } from 'react-native';
+import { Alert, Button, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View, useColorScheme } from 'react-native';
 import RNPickerSelect from 'react-native-picker-select';
 import { AppContext, DayData } from '../context/AppContext';
+import AdManager from './AdManager';
 import CalendarGrid from './CalendarGrid';
 
 const getMonthOptions = () => {
@@ -19,45 +21,50 @@ const getMonthOptions = () => {
 
 export default function MonthlyViewScreen() {
 
+  // Use centralized AdManager Banner component
+
   const { settings, firstLoad, calendarData, setCalendarData } = useContext(AppContext);
   const [selectedMonth, setSelectedMonth] = useState<string>(getMonthOptions()[1].value);
   const colorScheme = useColorScheme() as 'light' | 'dark';
 
-  // Ensure calendarData for selectedMonth is initialized
-  React.useEffect(() => {
-    if (firstLoad) return;
-    const [year, monthNum] = selectedMonth.split('-').map(Number);
-    const daysInMonth = new Date(year, monthNum, 0).getDate();
-    if (!calendarData[selectedMonth] || Object.keys(calendarData[selectedMonth]).length === 0) {
-      const monthData: Record<number, DayData> = {};
-      const today = new Date();
-      for (let d = 1; d <= daysInMonth; d++) {
-        const dateObj = new Date(year, monthNum - 1, d);
-        const applyTo = settings.applyTo ?? 'future';
-        if (applyTo === 'future') {
-          // Only apply settings to future dates
-          if (dateObj >= new Date(today.getFullYear(), today.getMonth(), today.getDate())) {
-            monthData[d] = {
+  // Ensure calendarData for selectedMonth is initialized and updates on tab focus
+  useFocusEffect(
+    React.useCallback(() => {
+      if (firstLoad) return;
+      const [year, monthNum] = selectedMonth.split('-').map(Number);
+      const daysInMonth = new Date(year, monthNum, 0).getDate();
+      if (!calendarData[selectedMonth] || Object.keys(calendarData[selectedMonth]).length === 0) {
+        const monthData: Record<string, DayData> = {};
+        const today = new Date();
+        for (let d = 1; d <= daysInMonth; d++) {
+          const dateObj = new Date(year, monthNum - 1, d);
+          const dateKey = `${year}-${String(monthNum).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+          const applyTo = settings.applyTo ?? 'future';
+          if (applyTo === 'future') {
+            if (dateObj >= new Date(today.getFullYear(), today.getMonth(), today.getDate())) {
+              monthData[dateKey] = {
+                volume: settings.defaultVolume,
+                cost: settings.costPerVolume,
+              };
+            } else {
+              if (monthData[dateKey] === undefined) {
+                monthData[dateKey] = {
+                  volume: 0,
+                  cost: 0,
+                };
+              }
+            }
+          } else {
+            monthData[dateKey] = {
               volume: settings.defaultVolume,
               cost: settings.costPerVolume,
             };
-          } else {
-            monthData[d] = {
-              volume: 0,
-              cost: 0,
-            };
           }
-        } else {
-          // Apply to all dates (currentAndFuture)
-          monthData[d] = {
-            volume: settings.defaultVolume,
-            cost: settings.costPerVolume,
-          };
         }
+        setCalendarData(prev => ({ ...prev, [selectedMonth]: monthData }));
       }
-      setCalendarData(prev => ({ ...prev, [selectedMonth]: monthData }));
-    }
-  }, [selectedMonth, calendarData, settings, setCalendarData, firstLoad]);
+    }, [selectedMonth, calendarData, settings, setCalendarData, firstLoad])
+  );
 
   // Calculate totals
   const monthDates = Object.values(calendarData[selectedMonth] || {}) as DayData[];
@@ -93,6 +100,14 @@ export default function MonthlyViewScreen() {
   };
   return (
     <View style={[styles.container, { backgroundColor: theme.bg }]}> 
+      {/* Banner ad above month selector */}
+      <View style={{ marginHorizontal: 12, marginTop: 12 }}>
+        {Platform.OS !== 'web' && AdManager.isAdMobAvailable() ? (
+          <AdManager.Banner style={styles.bannerAd} />
+        ) : (
+          <View style={styles.bannerAd}><Text style={{ color: theme.fg }}>Banner Ad Here</Text></View>
+        )}
+      </View>
       <View style={[styles.dropdownRow, { backgroundColor: theme.barBg, borderRadius: 12, margin: 12, padding: 12 }]}> 
         <TouchableOpacity
           style={[styles.monthNavBtn, { backgroundColor: theme.bg, borderColor: theme.border, opacity: currentIndex === 0 ? 0.5 : 1 }]}
@@ -159,4 +174,5 @@ const styles = StyleSheet.create({
   footer: { padding: 16, borderTopWidth: 1 },
   footerText: { fontWeight: 'bold', fontSize: 16 },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  bannerAd: { height: 60, borderRadius: 8, borderWidth: 1, borderColor: '#ddd', alignItems: 'center', justifyContent: 'center', backgroundColor: '#fafafa' },
 });

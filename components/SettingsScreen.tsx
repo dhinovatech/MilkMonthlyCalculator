@@ -1,8 +1,10 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useRouter } from 'expo-router';
 import React, { useContext, useEffect, useState } from 'react';
-import { Alert, Button, ScrollView, StyleSheet, Text, TextInput, View, useColorScheme } from 'react-native';
+import { Alert, Button, Platform, ScrollView, StyleSheet, Text, TextInput, View, useColorScheme } from 'react-native';
 import RNPickerSelect from 'react-native-picker-select';
 import { AppContext } from '../context/AppContext';
+import AdManager from './AdManager';
 
 const currencyOptions = [
   { label: 'INR (₹)', value: 'INR' },
@@ -24,14 +26,19 @@ const applyOptions = [
 ];
 
 export default function SettingsScreen() {
+  const router = useRouter();
   const colorScheme = useColorScheme() as 'light' | 'dark';
   const { settings, setSettings, firstLoad, setFirstLoad, updateCalendarData } = useContext(AppContext);
   const [localSettings, setLocalSettings] = useState(settings);
   // Use localSettings.applyTo for picker value
 
+  // AdManager handles ad unit ids and runtime availability
+
   useEffect(() => {
     setLocalSettings(settings);
   }, [settings]);
+
+  // Interstitial scheduling is handled at the application level in app/(tabs)/_layout.tsx
 
   const saveSettings = async () => {
   setSettings(localSettings);
@@ -39,6 +46,7 @@ export default function SettingsScreen() {
   if (firstLoad) setFirstLoad(false);
   else updateCalendarData(localSettings.applyTo ?? 'future', localSettings);
   Alert.alert('Settings Saved');
+  router.replace('/monthly');
   };
 
   const theme = {
@@ -52,8 +60,14 @@ export default function SettingsScreen() {
   return (
     <View style={[styles.container, { backgroundColor: theme.bg }]}> 
       <ScrollView contentContainerStyle={{ paddingBottom: 32 }}>
-        {/* Banner Ad Placeholder */}
-        <View style={styles.bannerAd}><Text style={{ color: theme.fg }}>Banner Ad Here</Text></View>
+        {/* Banner Ad or placeholder */}
+        <View style={styles.bannerAd}>
+          {Platform.OS !== 'web' && AdManager.isAdMobAvailable() ? (
+            <AdManager.Banner style={{ width: '100%' }} />
+          ) : (
+            <Text style={{ color: theme.fg }}>Banner Ad Here</Text>
+          )}
+        </View>
         <Text style={[styles.label, { color: theme.label }]}>Default Daily Milk Volume Unit</Text>
         <View style={styles.pickerWrap}>
           <RNPickerSelect
@@ -71,12 +85,12 @@ export default function SettingsScreen() {
           onChangeText={value => setLocalSettings({ ...localSettings, defaultVolume: parseFloat(value) || 0 })}
           placeholderTextColor={theme.fg}
         />
-        <Text style={[styles.label, { color: theme.label }]}>Cost per Volume</Text>
+  <Text style={[styles.label, { color: theme.label }]}>{`Cost per ${localSettings.unit ? localSettings.unit.charAt(0).toUpperCase() + localSettings.unit.slice(1) : 'Volume'}`}</Text>
         <TextInput
           style={[styles.input, { color: theme.fg, backgroundColor: theme.inputBg, borderColor: theme.border }]}
-          keyboardType="numeric"
+          keyboardType="decimal-pad"
           value={String(localSettings.costPerVolume)}
-          onChangeText={value => setLocalSettings({ ...localSettings, costPerVolume: Number(value) })}
+          onChangeText={value => setLocalSettings({ ...localSettings, costPerVolume: parseFloat(value) || 0 })}
           placeholderTextColor={theme.fg}
         />
         <Text style={[styles.label, { color: theme.label }]}>Currency</Text>

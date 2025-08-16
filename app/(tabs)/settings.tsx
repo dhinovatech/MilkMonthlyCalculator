@@ -1,11 +1,6 @@
 import React from 'react';
 import SettingsScreen from '../../components/SettingsScreen';
-import { AppProvider } from '../../context/AppContext';
 
 export default function SettingsTab() {
-  return (
-    <AppProvider>
-      <SettingsScreen />
-    </AppProvider>
-  );
+  return <SettingsScreen />;
 }

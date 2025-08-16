@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Button, Modal, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { Button, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 interface Settings {
   unit: string;
@@ -17,38 +17,41 @@ interface DayData {
 
 interface CalendarGridProps {
   month: string;
-  calendarData: Record<number, DayData>;
+  calendarData: Record<string, DayData>;
   settings: Settings;
-  setCalendarData: (data: Record<number, DayData>) => void;
+  setCalendarData: (data: Record<string, DayData>) => void;
   colorScheme?: 'light' | 'dark';
 }
 
 export default function CalendarGrid({ month, calendarData, settings, setCalendarData, colorScheme = 'light' }: CalendarGridProps) {
   // Parse month string (YYYY-MM)
-  const [selectedDay, setSelectedDay] = useState<number | null>(null);
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
   const [editVolume, setEditVolume] = useState<string>('');
   const [editCost, setEditCost] = useState<string>('');
+  const scrollRef = useRef<ScrollView | null>(null);
+  const weekLayouts = useRef<Record<number, number>>({});
 
   const [year, monthNum] = month.split('-').map(Number);
   const daysInMonth = new Date(year, monthNum, 0).getDate();
-  // Get weekday index for first day of month (0=Sunday, 6=Saturday)
   let firstDayWeekday = new Date(year, monthNum - 1, 1).getDay();
-  // Adjust for settings.weekdayStart
   if (settings.weekdayStart === 'monday') {
     firstDayWeekday = (firstDayWeekday === 0 ? 6 : firstDayWeekday - 1);
   }
 
   const openEditModal = (day: number) => {
-    setSelectedDay(day);
-    setEditVolume(String(calendarData[day]?.volume ?? settings.defaultVolume));
-    setEditCost(String(calendarData[day]?.cost ?? settings.costPerVolume));
-    setModalVisible(true);
+    const dateKey = `${year}-${String(monthNum).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    setSelectedDate(dateKey);
+    setEditVolume(String(calendarData[dateKey]?.volume ?? settings.defaultVolume));
+    setEditCost(String(calendarData[dateKey]?.cost ?? settings.costPerVolume));
+  // Scroll the week containing this day into view before opening modal
+  scrollToDay(day);
+  setModalVisible(true);
   };
 
   const saveEdit = () => {
-    if (selectedDay == null) return;
-    const newData = { ...calendarData, [selectedDay]: { volume: parseFloat(editVolume) || 0, cost: Number(editCost) } };
+    if (!selectedDate) return;
+    const newData = { ...calendarData, [selectedDate]: { volume: parseFloat(editVolume) || 0, cost: parseFloat(editCost) || 0 } };
     setCalendarData(newData);
     setModalVisible(false);
   };
@@ -63,6 +66,28 @@ export default function CalendarGrid({ month, calendarData, settings, setCalenda
     cost: 'rgba(116, 238, 68, 1)',
     volume: '#888',
   };
+  // Helper to scroll to the week index that contains a given day
+  const scrollToDay = (day: number) => {
+    const weekIndex = Math.floor((firstDayWeekday + (day - 1)) / 7);
+    const tryScroll = (attempt = 0) => {
+      const y = weekLayouts.current[weekIndex];
+      if (y !== undefined && scrollRef.current) {
+        scrollRef.current.scrollTo({ y: Math.max(0, y - 8), animated: true });
+      } else if (attempt < 10) {
+        setTimeout(() => tryScroll(attempt + 1), 80);
+      }
+    };
+    tryScroll();
+  };
+
+  // On mount, if the month includes today, scroll to today's week
+  useEffect(() => {
+    const today = new Date();
+    if (today.getFullYear() === year && (today.getMonth() + 1) === monthNum) {
+      scrollToDay(today.getDate());
+    }
+  }, [month]);
+
   return (
     <View style={[styles.grid, { backgroundColor: theme.bg }]}> 
       {/* Render header based on weekdayStart */}
@@ -72,7 +97,7 @@ export default function CalendarGrid({ month, calendarData, settings, setCalenda
         ))}
       </View>
       {/* Render days for selected month */}
-      <View style={styles.daysRow}>
+  <ScrollView ref={(r) => { scrollRef.current = r; }} style={styles.daysRow} contentContainerStyle={{ paddingBottom: 20 }}>
         {(() => {
           // Build array of all cells (empty + days)
           const cells = [];
@@ -90,13 +115,19 @@ export default function CalendarGrid({ month, calendarData, settings, setCalenda
           const weeks = [];
           for (let w = 0; w < cells.length / 7; w++) {
             weeks.push(
-              <View style={styles.weekRow} key={w}>
+              <View
+                style={styles.weekRow}
+                key={w}
+                onLayout={(e) => {
+                  weekLayouts.current[w] = e.nativeEvent.layout.y;
+                }}
+              >
                 {cells.slice(w * 7, w * 7 + 7).map((day, i) =>
                   day ? (
                     <TouchableOpacity style={[styles.dayCell, { backgroundColor: theme.cellBg }]} key={i} onPress={() => openEditModal(day)}>
                       <Text style={[styles.dayText, { color: theme.fg }]}>{day}</Text>
-                      <Text style={[styles.volume, { color: theme.volume }]}>{(calendarData[day]?.volume ?? settings.defaultVolume)} {settings.unit}</Text>
-                      <Text style={[styles.cost, { color: theme.cost }]}>{settings.currencySymbol}{Number(calendarData[day]?.cost ?? settings.costPerVolume).toFixed(2)}</Text>
+                      <Text style={[styles.volume, { color: theme.volume }]}>{(calendarData[`${year}-${String(monthNum).padStart(2, '0')}-${String(day).padStart(2, '0')}`]?.volume ?? settings.defaultVolume)} {settings.unit}</Text>
+                      <Text style={[styles.cost, { color: theme.cost }]}>{settings.currencySymbol}{Number(calendarData[`${year}-${String(monthNum).padStart(2, '0')}-${String(day).padStart(2, '0')}`]?.cost ?? settings.costPerVolume).toFixed(2)}</Text>
                     </TouchableOpacity>
                   ) : (
                     <View style={[styles.dayCell, { backgroundColor: theme.cellBg }]} key={i} />
@@ -107,11 +138,11 @@ export default function CalendarGrid({ month, calendarData, settings, setCalenda
           }
           return weeks;
         })()}
-      </View>
+      </ScrollView>
       <Modal visible={modalVisible} transparent animationType="slide">
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { backgroundColor: theme.modalBg }]}> 
-            <Text style={[styles.modalTitle, { color: theme.fg }]}>{selectedDay ? `${selectedDay} ${new Date(year, monthNum - 1, selectedDay).toLocaleString('default', { month: 'short' })} ${year}` : ''}</Text>
+            <Text style={[styles.modalTitle, { color: theme.fg }]}>{selectedDate ? `${selectedDate}` : ''}</Text>
             <Text style={{ color: theme.fg }}>Volume ({settings.unit}):</Text>
             <TextInput
               style={[styles.input, { color: theme.fg, borderColor: theme.border, backgroundColor: theme.bg }]}
@@ -123,7 +154,7 @@ export default function CalendarGrid({ month, calendarData, settings, setCalenda
             <Text style={{ color: theme.fg }}>Cost ({settings.currencySymbol}):</Text>
             <TextInput
               style={[styles.input, { color: theme.fg, borderColor: theme.border, backgroundColor: theme.bg }]}
-              keyboardType="numeric"
+              keyboardType="decimal-pad"
               value={editCost}
               onChangeText={setEditCost}
               placeholderTextColor={theme.cost}

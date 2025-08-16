@@ -17,7 +17,7 @@ export interface DayData {
   cost: number;
 }
 
-export type CalendarData = Record<string, Record<number, DayData>>;
+ export type CalendarData = Record<string, Record<string, DayData>>;
 
 const defaultSettings: Settings = {
   unit: 'litre',
@@ -80,19 +80,20 @@ export const AppProvider = ({ children }: AppProviderProps) => {
     setCalendarData(prevData => {
       const updatedData: CalendarData = { ...prevData };
       Object.keys(updatedData).forEach(monthKey => {
-        // monthKey format: 'YYYY-M'
+        // monthKey format: 'YYYY-M' or 'YYYY-MM'
         const [yearStr, monthStr] = monthKey.split('-');
         const year = Number(yearStr);
         const month = Number(monthStr);
         const daysInMonth = new Date(year, month, 0).getDate();
-        const monthData = { ...updatedData[monthKey] };
+        const monthData = { ...updatedData[monthKey] } as Record<string, DayData>;
 
         if (tenure === 'future') {
-          // Update all days after today in current month, and all days in future months
+          // Update all days in future months, and days after today in current month
           if (year > currentYear || (year === currentYear && month > currentMonth)) {
             // All days in future months
             for (let day = 1; day <= daysInMonth; day++) {
-              monthData[day] = {
+              const dateKey = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+              monthData[dateKey] = {
                 volume: newSettings.defaultVolume,
                 cost: newSettings.costPerVolume,
               };
@@ -100,26 +101,27 @@ export const AppProvider = ({ children }: AppProviderProps) => {
           } else if (year === currentYear && month === currentMonth) {
             // Only days after today in current month
             for (let day = currentDay + 1; day <= daysInMonth; day++) {
-              monthData[day] = {
+              const dateKey = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+              monthData[dateKey] = {
                 volume: newSettings.defaultVolume,
                 cost: newSettings.costPerVolume,
               };
             }
           }
         } else if (tenure === 'currentAndFuture') {
-          // All days in current month, and all days after today in future months
+          // Update all days in current month and all days in future months
           if (year === currentYear && month === currentMonth) {
-            // All days in current month
             for (let day = 1; day <= daysInMonth; day++) {
-              monthData[day] = {
+              const dateKey = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+              monthData[dateKey] = {
                 volume: newSettings.defaultVolume,
                 cost: newSettings.costPerVolume,
               };
             }
           } else if (year > currentYear || (year === currentYear && month > currentMonth)) {
-            // Only days after today in future months
-            for (let day = currentDay + 1; day <= daysInMonth; day++) {
-              monthData[day] = {
+            for (let day = 1; day <= daysInMonth; day++) {
+              const dateKey = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+              monthData[dateKey] = {
                 volume: newSettings.defaultVolume,
                 cost: newSettings.costPerVolume,
               };

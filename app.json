@@ -16,7 +16,8 @@
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "package": "com.dhinovatech.milkmonthlycalculator"
     },
     "web": {
       "bundler": "metro",
@@ -37,6 +38,16 @@
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "2d8243de-bd6d-4da3-bad4-07a473a8cb2c"
+      }
     }
+  },
+      "react-native-google-mobile-ads": {
+    "android_app_id": "ca-app-pub-2795699587731133~1198441061",
+    "ios_app_id": "ca-app-pub-2795699587731133~1198441061"
   }
 }
